@@ -1,122 +1,85 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
-import './App.css'
-
+import { useState, useEffect } from "react";
+import { fetchCharacters } from "./utils/fetchCharacters";
+import useDebounce from "./hooks/useDebounce";
+import CharacterCard from "./Components/CharacterCard";
+import SkeletonCard from "./Components/SkeletonCard";
+import ErrorState from "./Components/ErrorState";
+import SearchBar from "./Components/SearchBar";
+import FilterBar from "./Components/FilterBar";
+import "./App.css";
 function App() {
-  const [count, setCount] = useState(0)
-
+  const [characters, setCharacters] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [searchInput, setSearchInput] = useState("");
+  const [selectedFaction, setSelectedFaction] = useState("All");
+  const [sortBy, setSortBy] = useState("name");
+  const debouncedSearch = useDebounce(searchInput, 400);
+  const loadCharacters = () => {
+    setIsLoading(true);
+    setError(null);
+    fetchCharacters()
+      .then((data) => setCharacters(data))
+      .catch((err) => setError(err.message))
+      .finally(() => setIsLoading(false));
+  };
+  useEffect(() => {
+    loadCharacters();
+  }, []);
+  const getVisibleCharacters = () => {
+    let result = [...characters];
+    if (debouncedSearch.trim() !== "") {
+      result = result.filter((char) =>
+        char.name.toLowerCase().includes(debouncedSearch.toLowerCase())
+      );
+    }
+    if (selectedFaction !== "All") {
+      result = result.filter((char) => char.faction === selectedFaction);
+    }
+    result.sort((a, b) => {
+      if (sortBy === "age") {
+        return a.age - b.age;
+      }
+      return a.name.localeCompare(b.name);
+    });
+    return result;
+  };
+  const visibleCharacters = getVisibleCharacters();
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
+    <div className="app">
+      <header className="app-header">
+        <h1>Survey Corps WikiProject</h1>
+        <p>Cataloging humanity's strongest, bravest, and most doomed.</p>
+      </header>
+      {!error && (
+        <div className="controls">
+          <SearchBar searchInput={searchInput} onSearchChange={setSearchInput} />
+          <FilterBar
+            selectedFaction={selectedFaction}
+            onFactionChange={setSelectedFaction}
+            sortBy={sortBy}
+            onSortChange={setSortBy}
+          />
         </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.jsx</code> and save to test <code>HMR</code>
-          </p>
+      )}
+      {error ? (
+        <ErrorState message={error} onRetry={loadCharacters} />
+      ) : (
+        <div className="character-grid">
+          {isLoading
+            ? Array.from({ length: 8 }).map((_, index) => (
+                <SkeletonCard key={index} />
+              ))
+            : visibleCharacters.length > 0
+            ? visibleCharacters.map((character) => (
+                <CharacterCard key={character.id} character={character} />
+              ))
+            : (
+                <p className="no-results">No characters match your search.</p>
+              )}
         </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
-
-      <div className="ticks"></div>
-
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
-  )
+      )}
+    </div>
+  );
 }
-
-export default App
+export default App;
